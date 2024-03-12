@@ -1,4 +1,13 @@
 const api = require('./neo4jApi');
+import { paginationLimit } from './neo4jApi';
+// Import our custom CSS
+import '../scss/style.scss'
+
+// Import all of Bootstrap's JS
+import 'bootstrap'
+
+let page = 1;
+let totalCount = 0;
 
 $(function () {
   search();
@@ -9,7 +18,7 @@ $(function () {
   });
 
   $("#weightSelection").change(e => {
-    showRelatives($("td.species")[0].textContent, Number(e.target.value));
+    showRelatives($("#toSpecies").val(), Number(e.target.value));
   })
 });
 
@@ -19,7 +28,7 @@ function showRelatives(species, weight) {
     .then(relatedSpecies => {
       if (!relatedSpecies) return;
 
-      $("#toSpecies").val($("td.species")[0].textContent);
+      $("#toSpecies").val(species);
       const relatedSpeciesList = $("#relatedSpecies").empty();
 
       relatedSpecies.forEach(rs => {
@@ -34,17 +43,24 @@ function showRelatives(species, weight) {
 }
 
 
-function search(showFirst = true) {
+async function search(showFirst = true) {
   const query = $("#search").find("input[name=search]").val();
   renderGraph(query);
+
+  if (page === 1) {
+    totalCount = await api.countSpecies(query);
+    console.log(totalCount);
+  }
+
   api
-    .searchSpecies(query)
+    .searchSpecies(query, (page-1) * paginationLimit)
     .then(species => {
+      console.log(species);
       const t = $("table#results tbody").empty();
 
       if (species) {
         species.forEach((sp, index) => {
-          $(`<tr class=${index === 0 ? 'table-active': ''}>` + 
+          $(`<tr class=${index === 0 ? 'active-species': ''}>` + 
               `<td class='species'>${sp.species}</td>` + 
               `<td>${sp.genus}</td>` +
               `<td>${sp.family}</td>` +
@@ -55,17 +71,40 @@ function search(showFirst = true) {
             '</tr>')
             .appendTo(t)
             .click(function() {
-              $(".table-active").removeClass("table-active");
+              $(".active-species").removeClass("active-species");
               showRelatives($(this).find("td.species").text(), Number($("#weightSelection").val()));
-              $(this).addClass("table-active");
+              $(this).addClass("active-species");
               $("#toSpecies").val($(this).find("td.species").text());
             })
+        });
+
+        const pagesCount = Math.ceil(totalCount / paginationLimit);
+        $('#speciesPagination li').remove();
+        $('#speciesPagination').append(`<li class="page-item ${pagesCount <= 1 || page === 1 ? 'disabled' : ''}"><a class="page-link" href="#" id="page-first">First</a></li>`);
+        $(`#page-first`).click((e) => {
+          page=1;
+          search(true);
+        });
+        for(let i=Math.max(1, page-1); i<=Math.min(page+1, pagesCount); i++) {
+          $('#speciesPagination').append(`<li class="page-item"><a class="page-link" href="#" id="page-${i}">${i}</a></li>`);
+          $(`#page-${i}`).click((e) => {
+            page=Number(e.target.text); 
+            search(true);
+          });
+        }
+        $(`#page-${page}`).parent().addClass('active');
+
+        $('#speciesPagination').append(`<li class="page-item ${pagesCount <= 1 || page === pagesCount ? 'disabled' : ''}"><a class="page-link" href="#" id="page-last">Last</a></li>`);
+        $(`#page-last`).click((e) => {
+          page=pagesCount;
+          search(true);
         });
 
         const first = species[0];
         if (first && showFirst) {
           return showRelatives(first.species, Number($("#weightSelection").val()));
         }
+
       }
     });
 }
@@ -107,8 +146,6 @@ function renderGraph(query) {
   api
     .getGraph(query)
     .then(graph => {
-      console.log(graph);
-
       const links = graph.links.map(d => ({...d}));
       const nodes = graph.nodes.map(d => ({...d}));
 
@@ -136,7 +173,6 @@ function renderGraph(query) {
           .join("circle")
           .attr("class", d => "node " + d.label)
           .attr("r", d => d.label === "Species" ? 7 : 5);
-      console.log(node);
 
       node.append("title")
           .text(d => `name: ${d.name}, type: ${d.label}`);
@@ -159,15 +195,10 @@ function renderGraph(query) {
             .attr("cx", d => d.x)
             .attr("cy", d => d.y);
       });
-
-      console.log(svg);
-
       // When this cell is re-run, stop the previous simulation. (This doesn’t
       // really matter since the target alpha is zero and the simulation will
       // stop naturally, but it’s a good practice.)
       // invalidation.then(() => simulation.stop());
-
-      console.log(svg);
       return svg.node();
     });
 }

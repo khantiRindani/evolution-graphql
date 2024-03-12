@@ -1,4 +1,4 @@
-require('file-loader?name=[name].[ext]!../node_modules/neo4j-driver/lib/browser/neo4j-web.min.js');
+require('file-loader?name=[name].[ext]!../../node_modules/neo4j-driver/lib/browser/neo4j-web.min.js');
 const Species = require('./models/Species');
 const _ = require('lodash');
 
@@ -18,9 +18,23 @@ const driver = neo4j.driver(
     neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD),
 );
 
-console.log(`Database running at ${neo4jUri}`)
+const paginationLimit = 5;
 
-function searchSpecies(name) {
+
+async function countSpecies(name) {
+  const session = driver.session({database: database});
+  const { records } = await session.readTransaction((tx) =>
+      tx.run('MATCH (species:Species)-->(genus:Genus)\
+      WHERE toLower(species.name) CONTAINS toLower($name) \
+      WITH species as sp, genus.name as genus\
+      MATCH (sp)-->(family:Family), (sp)-->(order:Order), (sp)-->(class:Class)\
+      OPTIONAL MATCH (sp)-->(phylum:Phylum), (sp)-->(domain:Domain) \
+      RETURN count(sp) as speciesCount', {name})
+    );
+  return records[0].get('speciesCount')['low'];
+}
+
+function searchSpecies(name, offset, lim=paginationLimit) {
   const session = driver.session({database: database});
   return session.readTransaction((tx) =>
       tx.run('MATCH (species:Species)-->(genus:Genus)\
@@ -29,12 +43,11 @@ function searchSpecies(name) {
       MATCH (sp)-->(family:Family), (sp)-->(order:Order), (sp)-->(class:Class)\
       OPTIONAL MATCH (sp)-->(phylum:Phylum), (sp)-->(domain:Domain) \
       RETURN sp.name as species, genus, family.name as family, order.name as order, class.name as class, phylum.name as phylum, domain.name as domain\
-      LIMIT 5', {name})
+      SKIP $offset LIMIT $lim', {name, offset: neo4j.int(offset), lim: neo4j.int(lim)})
     )
     .then(result => {
       return result.records.map(record => {
         return new Species(record.get('species'), record.get('genus'), record.get('family'), record.get('order'), record.get('class'), record.get('domain'));
-
       });
     })
     .catch(error => {
@@ -50,8 +63,7 @@ function getRelatives(species, weight) {
   return session.readTransaction((tx) =>
       tx.run("MATCH (:Species {name:$species})-[r1]->()<-[r2]-(relatedSpecies)\
       WHERE r1.weight = $weight AND r2.weight = $weight\
-      RETURN relatedSpecies.name AS relatedSpecies\
-      LIMIT 10", {species, weight}))
+      RETURN relatedSpecies.name AS relatedSpecies", {species, weight}))
     .then(result => {
 
       if (_.isEmpty(result.records))
@@ -102,6 +114,8 @@ function getGraph(name) {
     });
 }
 
+exports.paginationLimit = paginationLimit;
+exports.countSpecies = countSpecies;
 exports.searchSpecies = searchSpecies;
 exports.getRelatives = getRelatives;
 exports.getGraph = getGraph;

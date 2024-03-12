@@ -6,21 +6,25 @@
   "license": "Apache-2.0",
   "private": true,
   "dependencies": {
+    "bootstrap": "^5.3.3",
     "dotenv": "^16.4.5",
     "lodash": "^4.17.21",
     "neo4j-driver": "^5.17.0"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.18",
     "css-loader": "^6.10.0",
     "file-loader": "^6.2.0",
-    "html-webpack-plugin": "^5.5.0",
-    "rimraf": "^3.0.2",
-    "webpack": "^5.90.1",
+    "html-webpack-plugin": "^5.6.0",
+    "postcss-loader": "^8.1.1",
+    "sass": "^1.71.1",
+    "sass-loader": "^14.1.1",
+    "style-loader": "^3.3.4",
+    "webpack": "^5.90.3",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1"
   },
   "scripts": {
-    "clean": "rimraf build",
     "build": "webpack",
     "start": "webpack serve"
   }
