@@ -84,8 +84,7 @@ function getGraph(name) {
   return session.readTransaction((tx) =>
     tx.run('MATCH (species:Species)-[rl]->(category) \
     WHERE toLower(species.name) CONTAINS toLower($name) \
-    RETURN species, rl, category \
-    LIMIT $limit', {name, limit: neo4j.int(100)}))
+    RETURN species, rl, category', {name}))
     .then(results => {
       const nodes = [], rels = [];
       let i = 0;

@@ -45,17 +45,15 @@ function showRelatives(species, weight) {
 
 async function search(showFirst = true) {
   const query = $("#search").find("input[name=search]").val();
-  renderGraph(query);
 
   if (page === 1) {
     totalCount = await api.countSpecies(query);
-    console.log(totalCount);
+    renderGraph(query);
   }
 
   api
     .searchSpecies(query, (page-1) * paginationLimit)
     .then(species => {
-      console.log(species);
       const t = $("table#results tbody").empty();
 
       if (species) {
@@ -131,7 +129,7 @@ function dragended(event) {
 }
 
 function renderGraph(query) {
-  const width = 900, height = 400;
+  const width = 1050, height = 260;
   // const force = d3.layout.force()
   //   .charge(-100).linkDistance(15).size([width, height]);
   $("#graph svg").remove();
@@ -140,7 +138,7 @@ function renderGraph(query) {
     .attr("width", width)
     .attr("height", height)
     .attr("viewBox", [-width/2, -height/2, width, height])
-    .attr("style", "max-width: 100%; height: auto;")
+    .attr("style", "max-width: 100%; height: auto; overflow: scroll")
     .attr("pointer-events", "all");
 
   api
