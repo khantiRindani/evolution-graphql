@@ -1,6 +1,5 @@
 require('file-loader?name=[name].[ext]!../node_modules/neo4j-driver/lib/browser/neo4j-web.min.js');
-const Movie = require('./models/Movie');
-const MovieCast = require('./models/MovieCast');
+const Species = require('./models/Species');
 const _ = require('lodash');
 
 const neo4j = window.neo4j;
@@ -21,17 +20,21 @@ const driver = neo4j.driver(
 
 console.log(`Database running at ${neo4jUri}`)
 
-function searchMovies(title) {
+function searchSpecies(name) {
   const session = driver.session({database: database});
   return session.readTransaction((tx) =>
-      tx.run('MATCH (movie:Movie) \
-      WHERE toLower(movie.title) CONTAINS toLower($title) \
-      RETURN movie',
-      {title})
+      tx.run('MATCH (species:Species)-->(genus:Genus)\
+      WHERE toLower(species.name) CONTAINS toLower($name) \
+      WITH species as sp, genus.name as genus\
+      MATCH (sp)-->(family:Family), (sp)-->(order:Order), (sp)-->(class:Class)\
+      OPTIONAL MATCH (sp)-->(phylum:Phylum), (sp)-->(domain:Domain) \
+      RETURN sp.name as species, genus, family.name as family, order.name as order, class.name as class, phylum.name as phylum, domain.name as domain\
+      LIMIT 5', {name})
     )
     .then(result => {
       return result.records.map(record => {
-        return new Movie(record.get('movie'));
+        return new Species(record.get('species'), record.get('genus'), record.get('family'), record.get('order'), record.get('class'), record.get('domain'));
+
       });
     })
     .catch(error => {
@@ -42,21 +45,19 @@ function searchMovies(title) {
     });
 }
 
-function getMovie(title) {
+function getRelatives(species, weight) {
   const session = driver.session({database: database});
   return session.readTransaction((tx) =>
-      tx.run("MATCH (movie:Movie {title:$title}) \
-      OPTIONAL MATCH (movie)<-[r]-(person:Person) \
-      RETURN movie.title AS title, \
-      collect([person.name, \
-           head(split(toLower(type(r)), '_')), r.roles]) AS cast \
-      LIMIT 1", {title}))
+      tx.run("MATCH (:Species {name:$species})-[r1]->()<-[r2]-(relatedSpecies)\
+      WHERE r1.weight = $weight AND r2.weight = $weight\
+      RETURN relatedSpecies.name AS relatedSpecies\
+      LIMIT 10", {species, weight}))
     .then(result => {
+
       if (_.isEmpty(result.records))
         return null;
 
-      const record = result.records[0];
-      return new MovieCast(record.get('title'), record.get('cast'));
+      return result.records.map(sp => sp.get('relatedSpecies'));
     })
     .catch(error => {
       throw error;
@@ -66,43 +67,29 @@ function getMovie(title) {
     });
 }
 
-function voteInMovie(title) {
-  const session = driver.session({ database: database });
-  return session.writeTransaction((tx) =>
-      tx.run("MATCH (m:Movie {title: $title}) \
-        SET m.votes = coalesce(m.votes, 0) + 1", { title }))
-    .then(result => {
-      return result.summary.counters.updates().propertiesSet
-    })
-    .finally(() => {
-      return session.close();
-    });
-}
-
-function getGraph() {
+function getGraph(name) {
   const session = driver.session({database: database});
   return session.readTransaction((tx) =>
-    tx.run('MATCH (m:Movie)<-[:ACTED_IN]-(a:Person) \
-    RETURN m.title AS movie, collect(a.name) AS cast \
-    LIMIT $limit', {limit: neo4j.int(100)}))
+    tx.run('MATCH (species:Species)-[rl]->(category) \
+    WHERE toLower(species.name) CONTAINS toLower($name) \
+    RETURN species, rl, category \
+    LIMIT $limit', {name, limit: neo4j.int(100)}))
     .then(results => {
       const nodes = [], rels = [];
       let i = 0;
       results.records.forEach(res => {
-        nodes.push({title: res.get('movie'), label: 'movie'});
-        const target = i;
-        i++;
+        let speciesIndex =_.findIndex(nodes, {name: res.get('species').properties.name, label: 'Species'});
+        let categoryIndex = _.findIndex(nodes, {name: res.get('category').properties.name, label: res.get('category')['labels'][0]});
+        if(speciesIndex === -1) {
+          nodes.push({name: res.get('species').properties.name, label: 'Species'});
+          speciesIndex = _.findIndex(nodes, {name: res.get('species').properties.name, label: 'Species'});
+        }
+        if (categoryIndex === -1) {
+          nodes.push({name: res.get('category').properties.name, label: res.get('category')['labels'][0]});
+          categoryIndex = _.findIndex(nodes, {name: res.get('category').properties.name, label: res.get('category')['labels'][0]});
+        }
 
-        res.get('cast').forEach(name => {
-          const actor = {title: name, label: 'actor'};
-          let source = _.findIndex(nodes, actor);
-          if (source === -1) {
-            nodes.push(actor);
-            source = i;
-            i++;
-          }
-          rels.push({source, target})
-        })
+        rels.push({source: speciesIndex, target: categoryIndex});
       });
 
       return {nodes, links: rels};
@@ -115,8 +102,6 @@ function getGraph() {
     });
 }
 
-exports.searchMovies = searchMovies;
-exports.getMovie = getMovie;
+exports.searchSpecies = searchSpecies;
+exports.getRelatives = getRelatives;
 exports.getGraph = getGraph;
-exports.voteInMovie = voteInMovie;
-

@@ -1,120 +1,173 @@
 const api = require('./neo4jApi');
 
 $(function () {
-  renderGraph();
   search();
 
   $("#search").submit(e => {
     e.preventDefault();
     search();
   });
+
+  $("#weightSelection").change(e => {
+    showRelatives($("td.species")[0].textContent, Number(e.target.value));
+  })
 });
 
-function showMovie(title) {
+function showRelatives(species, weight) {
   api
-    .getMovie(title)
-    .then(movie => {
-      if (!movie) return;
+    .getRelatives(species, weight)
+    .then(relatedSpecies => {
+      if (!relatedSpecies) return;
 
-      $("#title").text(movie.title);
-      $("#poster").attr("src","https://neo4j-documentation.github.io/developer-resources/language-guides/assets/posters/"+encodeURIComponent(movie.title)+".jpg");
-      const $list = $("#crew").empty();
-      movie.cast.forEach(cast => {
-        $list.append($("<li>" + cast.name + " " + cast.job + (cast.job === "acted" ? " as " + cast.role : "") + "</li>"));
-      });
-      $("#vote")
-        .unbind("click")
-        .click(function () {
-          voteInMovie(movie.title)
+      $("#toSpecies").val($("td.species")[0].textContent);
+      const relatedSpeciesList = $("#relatedSpecies").empty();
+
+      relatedSpecies.forEach(rs => {
+        $(`<tr><td>${rs}</td></tr>`)
+        .appendTo(relatedSpeciesList)
+        .click(function(){
+          $("#search").find("input[name=search]").val(rs);
+          search();
         })
+      })
     }, "json");
 }
 
-function voteInMovie(title) {
-  api.voteInMovie(title)
-    .then(() => search(false))
-    .then(() => showMovie(title));
-}
 
 function search(showFirst = true) {
   const query = $("#search").find("input[name=search]").val();
+  renderGraph(query);
   api
-    .searchMovies(query)
-    .then(movies => {
+    .searchSpecies(query)
+    .then(species => {
       const t = $("table#results tbody").empty();
 
-      if (movies) {
-        movies.forEach((movie, index) => {
-          $('<tr>' + 
-              `<td class='movie'>${movie.title}</td>` + 
-              `<td>${movie.released}</td>` +
-              `<td>${movie.tagline}</td>` + 
-              `<td id='votes${index}'>${movie.votes}</td>` +
+      if (species) {
+        species.forEach((sp, index) => {
+          $(`<tr class=${index === 0 ? 'table-active': ''}>` + 
+              `<td class='species'>${sp.species}</td>` + 
+              `<td>${sp.genus}</td>` +
+              `<td>${sp.family}</td>` +
+              `<td>${sp.order}</td>` +
+              `<td>${sp.clas}</td>` +
+              `<td>${sp.phylum}</td>` +
+              `<td>${sp.domain}</td>` +
             '</tr>')
             .appendTo(t)
             .click(function() {
-              showMovie($(this).find("td.movie").text());
+              $(".table-active").removeClass("table-active");
+              showRelatives($(this).find("td.species").text(), Number($("#weightSelection").val()));
+              $(this).addClass("table-active");
+              $("#toSpecies").val($(this).find("td.species").text());
             })
         });
 
-        const first = movies[0];
+        const first = species[0];
         if (first && showFirst) {
-          return showMovie(first.title);
+          return showRelatives(first.species, Number($("#weightSelection").val()));
         }
       }
     });
 }
 
-function renderGraph() {
-  const width = 800, height = 800;
-  const force = d3.layout.force()
-    .charge(-200).linkDistance(30).size([width, height]);
+// Reheat the simulation when drag starts, and fix the subject position.
+function dragstarted(event) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  event.subject.fx = event.subject.x;
+  event.subject.fy = event.subject.y;
+}
 
+// Update the subject (dragged node) position during drag.
+function dragged(event) {
+  event.subject.fx = event.x;
+  event.subject.fy = event.y;
+}
+
+// Restore the target alpha so the simulation cools after dragging ends.
+// Unfix the subject position now that it’s no longer being dragged.
+function dragended(event) {
+  if (!event.active) simulation.alphaTarget(0);
+  event.subject.fx = null;
+  event.subject.fy = null;
+}
+
+function renderGraph(query) {
+  const width = 900, height = 400;
+  // const force = d3.layout.force()
+  //   .charge(-100).linkDistance(15).size([width, height]);
+  $("#graph svg").remove();
+  
   const svg = d3.select("#graph").append("svg")
-    .attr("width", "100%").attr("height", "100%")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("viewBox", [-width/2, -height/2, width, height])
+    .attr("style", "max-width: 100%; height: auto;")
     .attr("pointer-events", "all");
 
   api
-    .getGraph()
+    .getGraph(query)
     .then(graph => {
-      force.nodes(graph.nodes).links(graph.links).start();
+      console.log(graph);
 
-      const link = svg.selectAll(".link")
-        .data(graph.links).enter()
-        .append("line").attr("class", "link");
+      const links = graph.links.map(d => ({...d}));
+      const nodes = graph.nodes.map(d => ({...d}));
 
-      const node = svg.selectAll(".node")
-        .data(graph.nodes).enter()
-        .append("circle")
-        .attr("class", d => {
-          return "node " + d.label
-        })
-        .attr("r", 10)
-        .call(force.drag);
+      const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links))
+        .force("charge", d3.forceManyBody())
+        .force("x", d3.forceX())
+        .force("y", d3.forceY());
 
-      // html title attribute
+      // Add a line for each link, and a circle for each node.
+      const link = svg.append("g")
+          .attr("stroke", "#999")
+          .attr("stroke-opacity", 0.6)
+          .selectAll("line")
+          .data(links)
+          .join("line")
+          // .attr("stroke-width", d => Math.sqrt(d.weight))
+          .attr("class", "link");
+
+      const node = svg.append("g")
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 1)
+          .selectAll("circle")
+          .data(nodes)
+          .join("circle")
+          .attr("class", d => "node " + d.label)
+          .attr("r", d => d.label === "Species" ? 7 : 5);
+      console.log(node);
+
       node.append("title")
-        .text(d => {
-          return d.title;
-        });
+          .text(d => `name: ${d.name}, type: ${d.label}`);
 
-      // force feed algo ticks
-      force.on("tick", () => {
-        link.attr("x1", d => {
-          return d.source.x;
-        }).attr("y1", d => {
-          return d.source.y;
-        }).attr("x2", d => {
-          return d.target.x;
-        }).attr("y2", d => {
-          return d.target.y;
-        });
+      // Add a drag behavior.
+      node.call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+      
+      // Set the position attributes of links and nodes each time the simulation ticks.
+      simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
 
-        node.attr("cx", d => {
-          return d.x;
-        }).attr("cy", d => {
-          return d.y;
-        });
+        node
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
       });
+
+      console.log(svg);
+
+      // When this cell is re-run, stop the previous simulation. (This doesn’t
+      // really matter since the target alpha is zero and the simulation will
+      // stop naturally, but it’s a good practice.)
+      // invalidation.then(() => simulation.stop());
+
+      console.log(svg);
+      return svg.node();
     });
 }

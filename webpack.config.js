@@ -3,8 +3,10 @@
 const Webpack = require('webpack');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+require('dotenv').config({ path: './.env' }); 
 
 const buildDirectory = path.join(__dirname, 'build');
+
 
 module.exports = {
   mode: 'development',
@@ -29,10 +31,10 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({template: 'src/assets/index.html'}),
     new Webpack.EnvironmentPlugin({
-      'NEO4J_URI': 'neo4j+s://demo.neo4jlabs.com',
-      'NEO4J_DATABASE': 'movies',
-      'NEO4J_USER': 'movies',
-      'NEO4J_PASSWORD': 'movies',
+      'NEO4J_URI': process.env.NEO4J_URI,
+      'NEO4J_DATABASE': process.env.NEO4J_DATABASE,
+      'NEO4J_USER': process.env.NEO4J_USER,
+      'NEO4J_PASSWORD': process.env.NEO4J_PASSWORD,
       'NEO4J_VERSION': ''
     })
   ],
