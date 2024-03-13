@@ -7,6 +7,9 @@ and Category linkage as relationships. For user ease, a JS/SCSS/bootstrap dashbo
 
 ## Demo:
 
+https://github.com/khantiRindani/evolution-graphql/assets/36477517/c89f8377-05c3-4c07-b52b-9a73485853f1
+
+
 ## Spec:
 
 ### Database:
@@ -15,6 +18,12 @@ and Category linkage as relationships. For user ease, a JS/SCSS/bootstrap dashbo
 Our graph is generated using tabular representation.
 - *Size:* 85205 species * 6 levels of categorization resulting into 113k nodes and 400k edges
 - *Model:*
+  
+  <img width="400" alt="Graph Model" src="https://github.com/khantiRindani/evolution-graphql/assets/36477517/f7024ea5-8ba0-449a-83ad-57d3eee0a4ba">
+- *Example Instance:*
+  
+  <img width="500" alt="Example Instance" src="https://github.com/khantiRindani/evolution-graphql/assets/36477517/c99a00e5-712e-4ad5-b462-7896416862ef">
+
 
 ### UI dashboard:
 - Scripting: JS
