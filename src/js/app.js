@@ -23,6 +23,11 @@ $(function () {
 });
 
 function showRelatives(species, weight) {
+  if (!species) {
+    $("#toSpecies").val(species);
+    $("#relatedSpecies").empty();
+    return;
+  }
   api
     .getRelatives(species, weight)
     .then(relatedSpecies => {
@@ -35,6 +40,8 @@ function showRelatives(species, weight) {
         $(`<tr><td>${rs}</td></tr>`)
         .appendTo(relatedSpeciesList)
         .click(function(){
+          page = 1;
+
           $("#search").find("input[name=search]").val(rs);
           search();
         })
@@ -98,11 +105,11 @@ async function search(showFirst = true) {
           search(true);
         });
 
-        const first = species[0];
-        if (first && showFirst) {
-          return showRelatives(first.species, Number($("#weightSelection").val()));
+        if (showFirst) {
+          return showRelatives(species[0]?.species, Number($("#weightSelection").val()));
         }
-
+      } else {
+        return showRelatives('', Number($("#weightSelection").val()));
       }
     });
 }
