@@ -1,14 +1,14 @@
 ## Description:
 
-This is a UI dashboard over Evolution Graph Dataset offering capabilities to realize similarity and origins between species. 
+This repo contains web-apps over Evolution Graph Dataset offering capabilities to realize similarity and origins between species. 
 
-Evolution of Species - studied by Darwin follows connected graph structure. Here, we've built the dataset on Neo4j using Species as nodes
-and Category linkage as relationships. For user ease, a JS/SCSS/bootstrap dashboard app is built over neo4j dataset.
+Evolution of Species - studied by Darwin follows connected graph structure. Here, we've built the dataset on Neo4j using Species as nodes and Category linkage as relationships. For user ease, a JS/SCSS/bootstrap dashboard app is built over neo4j dataset. Also,
+graphql API server is setup for API support.
 
 ## Demo:
 
+### UI Dashboard:
 https://github.com/khantiRindani/evolution-graphql/assets/36477517/c89f8377-05c3-4c07-b52b-9a73485853f1
-
 
 ## Spec:
 
@@ -33,4 +33,8 @@ Our graph is generated using tabular representation.
 - Package: npm
 - Build: webpack
 
-
+### API server:
+- API kind: GraphQL (native graph model)
+- API schema: Type definition in GraphQL query, Resolver Auto-setup + type extension through neo4j/graphql library
+- Server: Apollo Server
+- Package: npm
